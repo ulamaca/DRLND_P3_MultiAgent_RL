@@ -1,21 +1,34 @@
 [image1]: ./data/ppo_gae.png 
-[image2]: ./data/ppo_algorithm1.png
+[image2]: ./data/alg_maddpg.png
 [anime1]: ./data/ppo_trained_animation.gif
 ### **Algorithms**
-In this project, I used Proximal Policy Optimization (PPO) to solve Unity Reacher Environment. PPO aims to solve a major limitation in policy gradients methods: data inefficeincy. 
-Each trajectory can validly be used for updating the policy network only once in Policy Gradients (PG). This is wasteful especially when the generation process is slow, resource-consuming or even dangerous.  
-With tricks of importance sampling, surrogate objectives, and surrogate clipping, the policy network in PPO can then be updated multiple times using a generated trajectory (generated from an "old policy") without losing track from the true objective function. 
-This technique enhances data efficiency greatly by creating off-policy learning (improving a policy other than the trajectory generating one) alike capability for PG algorithm. 
+In this project, I applied MADDPG (Multi-Agent Deep Deterministic Policy Gradients) to solve a 2-agent Tennis game (Unity Tennis environment). 
+DDPG is one of the most basic form of deep reinforcement learning agent for solving continuous control problems. By using deterministic policy, policy gradients with respect to 
+the value function is computable. Therefore, DDPG algorithm replaces such policy in DQN and re-formulate it as an actor-critic style learning algorithms where 
+Q-function is learned using deep-Q learning and policy learning part use the aforementioned gradients. 
+
+In MADDPG paper, the authors develop some tricks to apply DDPG in multi-agent setting. The most notorious problem in multi-agent control problem is that
+the environment is not a MDP anymore if any policy in the system is changed. Such problem will lead to great confusion (e.g. contradictory gradients for competing agents) for learning.
+One major trick here is that if the actions of all agents are given, then it will be a MDP again. 
+To utilize this property, one can represent centralized value function that takes into account all states/actions from all agents.
+Then, with centralized critic, DDPG can be applied again to each agent. Since MADDPG does not assume specific multi-agent setting, it has been shown
+to perform well in competitive, cooperative and mixed scenarios. 
+   
+
 
 ### **Implementation**
-My implementation is based on the idea of Algorithm 1 in John Schulman et al's 2017 paper: ![Algorithm 1][image2]
+My implementation is based on the idea of Algorithm in Appendix in MADDPG paper: ![Algorithm 1][image2]
 
 
-where policy is a Gaussian whose mean and variance are tuneable (the mean $\mu$ is represented by a multi-layer fully perceptron whereas the variance is parametrized seperately by another independent set of variables). 
-The value function is constructed by a NN sharing the main body with the policy and the output a 1-d state value.
-The advantage is estimated through generalized value estimation (GAE) and it is standardized over trajectories.
+where:
+ds=24, da=2, n=2
+for each agent, it has both
+    policy ( mapping: ds->da, a MLP, output layer tanh)
+    critic ( mapping: n*(ds+da)->1, a MLP, output layer linear) 
 
-In addition, the actor loop for trajectories collection in Algorithm 1 is a perfect fit for parallelization. Parallelization enables efficient data collection (which may accelerate learning) and gathers potentially diverse experience data via, for example, adopting different exploration strategy in each thread. I thus choose multi-agent version of the environment to take advantage of such nature. A buffer (MAReacherTrajectories) is created for storing trajectories using torch.utils.data to organize the data format and mini-batch generation. Note that the current implementation using only fixed exploring strategy (the current policy)
+All agents share a single replay buffer but samples their own experiences separately during learning.
+For each learning step, each agent will be updated in sequence. 
+
 
 ### **Results**  
 
@@ -28,19 +41,14 @@ The agent solves the environment in 187 episodes. The total time elapsed is 1198
 ![trained agent][anime1]: ./data/ppo_trained_animation.gif
 
 ### **Future Work**
-- Future experiments:
-    - Compare performance of different value estimators to see if GAE is really the best. The currently available options are:
-        1. Monte-Carlo value estimate: the future reward in PPO lecture and note that critic is not necessary in this case. 
-        2. Direct value estimate: using the state value function for each state directly
-        3. Advantage: i.e. 1.-2., the advantage estimate used in A3C paper 
-    - Make it work in OpenAI Gym environments to see how well they work and do benchmarking.
-- The current version is using multiple agents but not written in a genuinely parallel way. Therefore, it will be worthy to delve deeper into parallelization tools such as [MPI](http://mpitutorial.com/tutorials/mpi-introduction/) to further boost learning efficiency.  
-- Compare the current implementation to SOTA methods able to solve continuous problems such as Soft Actor-Critic and D4PG/DDPG to compare their individual learning efficacy/efficiency.
+- Extend our DDPG implementation to SOTA (e.g. TD3) to see potential improvement 
+- Using hindsight experience replay (HER) or parameter noise to boot data efficiency/ exploration.
+-  
 
 ### **Reference**
 Research Papers:
-- [Proximal Policy Optimization 2017](https://www.nature.com/articles/nature14236)
-- [A3C 2016](https://arxiv.org/abs/1602.01783)
+- [MADDPG 2017](https://arxiv.org/pdf/1706.02275.pdf)
+- [DDPG 2015](https://arxiv.org/abs/1602.01783)
 - [Soft Actor Critic 2018](https://arxiv.org/abs/1801.01290)
 
 Related works:
