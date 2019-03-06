@@ -85,6 +85,8 @@ class Agent():
         # print("rewards shape (in learn)", rewards.shape)
         # print("next_states (in learn)", next_states.shape)
         # print("dones (in learn)", dones.shape)
+        # print("a_pred_loc (in learn)", actions_pred_loc.shape)
+        # print("next_a_pred_tar (in learn)", next_actions_pred_tar.shape)
 
         # ---------------------------- update critic ---------------------------- #
         # Get predicted next-state actions and Q values from target models

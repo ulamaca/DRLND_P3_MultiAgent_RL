@@ -82,10 +82,12 @@ class MADDPGAGENT():
         if self.t_step == 0:
             if len(self.memory) > BATCH_SIZE:
                 for _ in range(UPDATES_PER_LEARN):
-                    experiences = self.memory.sample()
+                    multi_agent_experiences=dict([(i,None) for i in range(self.n_agents)])
+                    for ith_agent in range(self.n_agents):
+                        multi_agent_experiences[ith_agent] = self.memory.sample()
                     #print("current memory length", len(self.memory))
                     # print("learning happening")
-                    self.learn(experiences, GAMMA)
+                    self.learn(multi_agent_experiences, GAMMA)
 
     def single_agent_act(self, o_i, ith_agent, add_noise=True):
         """return actions of all agents"""
@@ -105,7 +107,7 @@ class MADDPGAGENT():
         for i in range(self.n_agents):
             self.agents[i].reset()
 
-    def learn(self, experiences, gamma):
+    def learn(self, multi_agent_experiences, gamma):
         """Update policy and value parameters using given batch of experience tuples.
         Q_targets = r + γ * critic_target(next_state, actor_target(next_state))
         where:
@@ -117,32 +119,58 @@ class MADDPGAGENT():
             experiences (Tuple[torch.Tensor]): tuple of (s, a, r, s', done) tuples 
             gamma (float): discount factor
         """
-        xmems, actions, rewards, next_xmems, dones = experiences
 
+        #v2
+        for ith_agent, experiences in multi_agent_experiences.items():
+            xmems, actions, rewards, next_xmems, dones = experiences
 
+            # predict action from policy
+            as_pred_loc=[]
+            next_as_pred_targ = []
+            for j in range(self.n_agents):
+                # 1. for as_pred_loc:
+                o_is =  xmem_to_oi(xmems, j, self.state_size)
+                # print("o_is shape", o_is.shape)
+                a_pred_loc = self.agents[j].actor_local(o_is) # using local net for policy learning
+                as_pred_loc.append(a_pred_loc)
 
-        actions_pred_loc=[]
-        for ith_agent in range(self.n_agents):
-            o_is =  xmem_to_oi(xmems, ith_agent, self.state_size)
-            # print("o_is shape", o_is.shape)
-            a_loc = self.agents[ith_agent].actor_local(o_is)
-            actions_pred_loc.append(a_loc)
+                # 2. for next_as_pred_targ:
+                next_o_is =  xmem_to_oi(next_xmems, j, self.state_size)
+                # print("o_is shape", o_is.shape)
+                next_a_pred_targ = self.agents[j].actor_target(next_o_is).detach() # using target net for value only
+                next_as_pred_targ.append(next_a_pred_targ)
+            next_as_pred_targ=torch.cat(next_as_pred_targ, dim=-1)
+            #print("Mu(x') shape: ", next_as_pred_targ.shape)
 
-        next_actions_pred_targ=[]
-        for ith_agent in range(self.n_agents):
-            o_is =  xmem_to_oi(next_xmems, ith_agent, self.state_size)
-            # print("o_is shape", o_is.shape)
-            a_targ = self.agents[ith_agent].actor_local(o_is)
-            next_actions_pred_targ.append(a_targ)
-
-        #print("Mu(x') shape: ", next_actions_pred.shape)
-
-        for ith_agent in range(self.n_agents):
-            actions_pred_loc_i=[a if i==ith_agent else a.detach() for i, a in enumerate(next_actions_pred)]
-            actions_pred_loc_i=torch.cat(actions_pred_loc_i, dim=-1) # the last dim = dim(A)
+            # learning
+            as_pred_loc_ith=[a if i==ith_agent else a.detach() for i, a in enumerate(as_pred_loc)]
+            as_pred_loc_ith=torch.cat(as_pred_loc_ith, dim=-1) # the last dim = dim(A)
             single_ddpg_exps=(xmems, actions, rewards[:, ith_agent, np.newaxis], next_xmems, dones[:, ith_agent, np.newaxis])
             self.agents[ith_agent].learn(single_ddpg_exps, gamma,
-                                         actions_pred_loc_i, next_actions_pred_targ) # action prediction
+                                         as_pred_loc_ith, next_as_pred_targ) # action prediction
+        # v1:
+        # actions_pred_loc=[]
+        # for ith_agent in range(self.n_agents):
+        #     o_is =  xmem_to_oi(xmems, ith_agent, self.state_size)
+        #     # print("o_is shape", o_is.shape)
+        #     a_loc = self.agents[ith_agent].actor_local(o_is)
+        #     actions_pred_loc.append(a_loc)
+        #
+        # next_actions_pred_targ=[]
+        # for ith_agent in range(self.n_agents):
+        #     o_is =  xmem_to_oi(next_xmems, ith_agent, self.state_size)
+        #     # print("o_is shape", o_is.shape)
+        #     a_targ = self.agents[ith_agent].actor_local(o_is)
+        #     next_actions_pred_targ.append(a_targ)
+        #
+        # #print("Mu(x') shape: ", next_actions_pred.shape)
+        #
+        # for ith_agent in range(self.n_agents):
+        #     actions_pred_loc_i=[a if i==ith_agent else a.detach() for i, a in enumerate(next_actions_pred)]
+        #     actions_pred_loc_i=torch.cat(actions_pred_loc_i, dim=-1) # the last dim = dim(A)
+        #     single_ddpg_exps=(xmems, actions, rewards[:, ith_agent, np.newaxis], next_xmems, dones[:, ith_agent, np.newaxis])
+        #     self.agents[ith_agent].learn(single_ddpg_exps, gamma,
+        #                                  actions_pred_loc_i, next_actions_pred_targ) # action prediction
 
 
 
