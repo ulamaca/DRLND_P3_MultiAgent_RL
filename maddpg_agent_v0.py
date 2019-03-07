@@ -8,7 +8,7 @@ import torch
 
 # todo, check hyperparam
 BUFFER_SIZE = int(3e4)  # replay buffer size
-BATCH_SIZE = 256       # minibatch size
+BATCH_SIZE = 128        # minibatch size
 GAMMA = 0.99            # discount factor
 LR_ACTOR = 1e-4         # learning rate of the actor 
 LR_CRITIC = 1e-3        # learning rate of the critic
@@ -23,7 +23,7 @@ def xenv_to_xmem(xenv):
         input format of [n_agents, ds] in np.array
         output format of [1, n_agents*ds] in np.array
     """
-    return xenv.reshape((-1))
+    return xenv.reshape((-1, xenv.shape[0]*xenv.shape[1]))
 
 
 def xenv_to_oi(xenv, ith_agent):
@@ -31,8 +31,7 @@ def xenv_to_oi(xenv, ith_agent):
         input format of [n_agents, ds] in np.array
         output format of [1, ds] in np.array
     """
-    #return xenv[np.newaxis, ith_agent, :]
-    return np.reshape(xenv[ith_agent,:], newshape=(1,-1)
+    return xenv[np.newaxis, ith_agent, :]
 
 
 def xmem_to_oi(xmem, ith_agent, state_size):
@@ -76,11 +75,9 @@ class MADDPGAGENT():
     def step(self, xenv, action, reward, next_state, done):
         """Save experience in replay memory, and use random sample from buffer to learn."""
         # Save experience / reward
-        self.memory.add(xenv,
-                        xenv_to_xmem(xenv),
+        self.memory.add(xenv_to_xmem(xenv),
                         xenv_to_xmem(action),
                         reward,
-                        next_state,
                         xenv_to_xmem(next_state),
                         done)
 
@@ -105,13 +102,7 @@ class MADDPGAGENT():
         actions=[]
         for ith_agent in range(self.n_agents):
             o_i=xenv_to_oi(xenv, ith_agent)
-            action=self.single_agent_act(o_i, ith_agent, add_noise=add_noise)
-            action=np.reshape(action, newshape=(1, -1))
-
-            print("final action shape:", action.shape)
-            print(A)
-
-            actions.append(action)
+            actions.append(self.single_agent_act(o_i, ith_agent, add_noise=add_noise))
         actions = np.concatenate(actions, axis=0)
         return actions
 
@@ -133,29 +124,36 @@ class MADDPGAGENT():
         """
 
         #v3
-        xs, xmems, states, actions, rewards, next_states, next_xmems, dones = experiences
+        xmems, actions, rewards, next_xmems, dones = experiences
 
         # 1. predict action from policy
-        next_as_pred_targ = torch.zeros(states.shape[:2] + (self.action_size,), dtype=torch.float, device=device)
+        as_pred_loc=[]
+        next_as_pred_targ = []
         for jth_agent in range(self.n_agents): # j for another iterator for n_agents
-            # 2. for next_as_pred_targ (for critic learning):
-            next_o_is = next_states[:, ith_agent, :]
-            # todo, a=(a1,a2,...mu(oi),...aN)
-            next_as_pred_targ[:, jth_agent, :] = self.agents[jth_agent].actor_target(next_o_is) # todo, if to detach??, using target net for value only
+            # 1. for as_pred_loc (for policy learning):
+            o_is =  xmem_to_oi(xmems, jth_agent, self.state_size)
+            # print("o_is shape", o_is.shape)
+            a_pred_loc = self.agents[jth_agent].actor_local(o_is) # using local net for policy learning
+            as_pred_loc.append(a_pred_loc)
 
-        agent_state = states[:,ith_agent,:]
-        as_pred_loc = actions.clone() #create a deep copy
-        as_pred_loc[:,ith_agent,:] = self.agents[ith_agent].actor_local.forward(agent_state)
-        as_pred_loc = as_pred_loc.view(-1, self.action_size*self.n_agents)
+            # 2. for next_as_pred_targ (for critic learning):
+            next_o_is =  xmem_to_oi(next_xmems, jth_agent, self.state_size)
+            # print("o_is shape", o_is.shape)
+            # todo, a=(a1,a2,...mu(oi),...aN)
+            next_a_pred_targ = self.agents[jth_agent].actor_target(next_o_is) # todo, if to detach??, using target net for value only
+            next_as_pred_targ.append(next_a_pred_targ)
+        next_as_pred_targ=torch.cat(next_as_pred_targ, dim=1)
 
         # 2. learning
+        as_pred_loc_ith=[a if i==ith_agent else a.detach() for i, a in enumerate(as_pred_loc)]
+        as_pred_loc_ith=torch.cat(as_pred_loc_ith, dim=1) # the last dim = dim(A)
         single_ddpg_exps=(xmems, actions,
                           rewards[:, ith_agent].view(-1, 1),
                           next_xmems,
                           dones[:, ith_agent].view(-1, 1))
 
         self.agents[ith_agent].learn(single_ddpg_exps, gamma,
-                                     as_pred_loc, next_as_pred_targ)
+                                     as_pred_loc_ith, next_as_pred_targ)
 
 
 class ReplayBuffer:
@@ -171,28 +169,27 @@ class ReplayBuffer:
         self.action_size = action_size
         self.memory = deque(maxlen=buffer_size)  # internal memory (deque)
         self.batch_size = batch_size
-        self.experience = namedtuple("Experience", field_names=["x", "state", "action", "reward", "next_x", "next_state", "done"])
+        self.experience = namedtuple("Experience", field_names=["state", "action", "reward", "next_state", "done"])
         self.seed = random.seed(seed)
 
-    def add(self, x, state, action, reward, next_x, next_state, done):
+    def add(self, state, action, reward, next_state, done):
         """Add a new experience to memory."""
-        e = self.experience(x, state, action, reward, next_x, next_state, done)
+        e = self.experience(state, action, reward, next_state, done)
         self.memory.append(e)
 
     def sample(self):
         """Randomly sample a batch of experiences from memory."""
         experiences = random.sample(self.memory, k=self.batch_size)
 
-        xs = torch.from_numpy(np.array([e.x for e in experiences if e is not None])).float().to(device)
         states = torch.from_numpy(np.vstack([e.state for e in experiences if e is not None])).float().to(device)
         actions = torch.from_numpy(np.vstack([e.action for e in experiences if e is not None])).float().to(device)
         rewards = torch.from_numpy(np.vstack([e.reward for e in experiences if e is not None])).float().to(device)
-        next_xs = torch.from_numpy(np.array([e.next_x for e in experiences if e is not None])).float().to(device)
-        next_states = torch.from_numpy(np.vstack([e.next_state for e in experiences if e is not None])).float().to(device)
+        next_states = torch.from_numpy(np.vstack([e.next_state for e in experiences if e is not None])).float().to(
+            device)
         dones = torch.from_numpy(np.vstack([e.done for e in experiences if e is not None]).astype(np.uint8)).float().to(
             device)
 
-        return (xs, states, actions, rewards, next_xs, next_states, dones)
+        return (states, actions, rewards, next_states, dones)
 
     def __len__(self):
         """Return the current size of internal memory."""
