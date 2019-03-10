@@ -8,10 +8,10 @@ the value function is computable. Therefore, DDPG algorithm replaces such policy
 Q-function is learned using deep-Q learning and policy learning part use the aforementioned gradients. 
 
 In MADDPG paper, the authors develop some tricks to apply DDPG in multi-agent setting. The most notorious problem in multi-agent control problem is that
-the environment is not a MDP anymore if any policy in the system is changed. Such problem will lead to great confusion (e.g. contradictory gradients for competing agents) for learning.
+the environment is not a MDP anymore if any policy in the system is changed. Such problem will lead to great confusion (e.g. contradictory gradients for competing agents) during learning.
 One major trick here is that if the actions of all agents are given, then it will be a MDP again. 
-To utilize this property, one can represent centralized value function that takes into account all states/actions from all agents.
-Then, with centralized critic, DDPG can be applied again to each agent. Since MADDPG does not assume specific multi-agent setting, it has been shown
+To utilize this property, one can represent centralized value functions that takes into account all states/actions from all agents.
+Then, one can train a multi-agent system with all agents having a centralized critic and (local) policy. Since MADDPG does not assume specific multi-agent setting, it has been shown
 to perform well in competitive, cooperative and mixed scenarios. 
    
 
@@ -43,13 +43,14 @@ The agent solves the environment in 187 episodes. The total time elapsed is 1198
 ### **Future Work**
 - Extend our DDPG implementation to SOTA (e.g. TD3) to see potential improvement 
 - Using hindsight experience replay (HER) or parameter noise to boot data efficiency/ exploration.
--  
+- Add tensorboard functions to get better debugging experiences.
+- Try self-play training, for example, using a single actor and critic for both agents in Tennis game.
+- Work on solving the harder Soccer environment. 
 
 ### **Reference**
 Research Papers:
-- [MADDPG 2017](https://arxiv.org/pdf/1706.02275.pdf)
-- [DDPG 2015](https://arxiv.org/abs/1602.01783)
-- [Soft Actor Critic 2018](https://arxiv.org/abs/1801.01290)
+- [MADDPG 2017](https://arxiv.org/pdf/1706.02275)
+- [DDPG 2015](https://arxiv.org/abs/1509.02971)
 
 Related works:
 - [tnakae: Udacity-DeepRL-p2-Continuous](https://github.com/tnakae/Udacity-DeepRL-p2-Continuous) (greatly appreciated for the work/author, really helpful for my implementation)
