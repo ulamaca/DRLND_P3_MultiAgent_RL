@@ -2,7 +2,7 @@ from unityagents import UnityEnvironment
 import environment
 from collections import deque
 import numpy as np
-from maddpg_agent import MADDPGAGENT
+from maddpg_agent_v0 import MADDPGAGENT
 import os
 
 n_epsisodes=2000
