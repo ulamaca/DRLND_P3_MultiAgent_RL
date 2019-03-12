@@ -15,7 +15,7 @@ class UnityMLVectorMultiAgent():
             file_name = 'Tennis.app'
         elif os == 'Linux':
             file_name = 'Tennis_Linux/Tennis.x86_64'
-        self.env = UnityEnvironment(file_name='unity_envs/' + file_name, seed=seed)
+        self.env = UnityEnvironment(file_name="./"+file_name, seed=seed)
         self.brain_name = self.env.brain_names[0]
         self.evaluation_only = evaluation_only
 
