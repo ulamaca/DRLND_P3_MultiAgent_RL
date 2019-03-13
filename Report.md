@@ -43,9 +43,23 @@ The agent solves the environment in 187 episodes. The total time elapsed is 1198
 ### **Future Work**
 - Extend our DDPG implementation to SOTA (e.g. TD3) to see potential improvement 
 - Using hindsight experience replay (HER) or parameter noise to boot data efficiency/ exploration.
-- Add tensorboard functions to get better debugging experiences.
+- Add tensorboard and develop AWS functions to get better debugging experiences. 
 - Try self-play training, for example, using a single actor and critic for both agents in Tennis game.
 - Work on solving the harder Soccer environment. 
+
+
+### **To be done**
+- add load mechanisms
+- Technical Notes
+    - 3 sources of randomness: NN, Buffer, Noise generation
+    - PyTorch gradients for DDPG (Actor/Critic individual parts)
+    - target/local networks joint initialization
+- resort: if not working, ask for the working version (recall the episodic noise adding)
+- update my code documentation
+    - about the noise process
+- re-organization of the code in the end
+- MISC:
+    - flexible net work definition using FCNETWORK... (need additional debugging)
 
 ### **Reference**
 Research Papers:
