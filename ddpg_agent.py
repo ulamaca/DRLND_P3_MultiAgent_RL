@@ -7,18 +7,30 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 # todo, check hyperparam
-TAU = 1e-3              # for soft update of target parameters
-WEIGHT_DECAY = 0.0      # L2 weight decay
+
+WEIGHT_DECAY_ACTOR = 0.0      # L2 weight decay
+WEIGHT_DECAY_CRITIC = 0.0      # L2 weight decay
+
+NOISE_START = 1.0
+NOISE_END = 0.2
+NOISE_REDUCTION = 0.999
+EPISODES_BEFORE_TRAINING = 300
+
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+
+
+
+
 
 class Agent():
     """Interacts with and learns from the environment."""
     
-    def __init__(self, state_size, action_size, n_agents, random_seed,
+    def __init__(self, state_size, action_size, n_agents, random_seed=10,
                  lr_a=1e-4, lr_c=1e-4):
         """Initialize an Agent object.
-        
+
         Params
         ======
             state_size (int): dimension of each state
@@ -32,36 +44,49 @@ class Agent():
         self.lr_a=lr_a
         self.lr_c=lr_c
         self.seed = random.seed(random_seed)
-        self.t_step = 0
+
 
         # Actor Network (w/ Target Network)
         self.actor_local = Actor(state_size, action_size, random_seed).to(device)
         self.actor_target = Actor(state_size, action_size, random_seed).to(device)
-        self.actor_optimizer = optim.Adam(self.actor_local.parameters(), lr=self.lr_a)
+        self.actor_optimizer = optim.Adam(self.actor_local.parameters(), lr=self.lr_a, weight_decay=WEIGHT_DECAY_ACTOR)
 
         # Critic Network (w/ Target Network)
         self.critic_local = Critic(state_size * n_agents, action_size * n_agents, random_seed).to(device)
         self.critic_target = Critic(state_size * n_agents, action_size * n_agents, random_seed).to(device)
-        self.critic_optimizer = optim.Adam(self.critic_local.parameters(), lr=self.lr_c, weight_decay=WEIGHT_DECAY)
+        self.critic_optimizer = optim.Adam(self.critic_local.parameters(), lr=self.lr_c, weight_decay=WEIGHT_DECAY_CRITIC)
 
         # Noise process
         self.noise = OUNoise(action_size, random_seed)
 
-    def act(self, state, add_noise=True):
+    def act(self, states, i_episode, add_noise=True):
         """Returns actions for given state as per current policy."""
-        state = torch.from_numpy(state).float().to(device)
+
+        if i_episode > EPISODES_BEFORE_TRAINING and self.noise_scale > NOISE_END:
+            # self.noise_scale *= NOISE_REDUCTION
+            self.noise_scale = NOISE_REDUCTION ** (i_episode - EPISODES_BEFORE_TRAINING)
+        # else keep the previous value
+
+        if not add_noise:
+            self.noise_scale = 0.0
+
+        states = torch.from_numpy(states).float().to(device)
         self.actor_local.eval()
         with torch.no_grad():
-            action = self.actor_local(state).cpu().data.numpy()
+            actions = self.actor_local(states).cpu().data.numpy()
         self.actor_local.train()
-        if add_noise:
-            action += self.noise.sample()
-        return action
+
+        # add noise
+        actions += self.noise_scale * self.add_noise2()  # works much better than OU Noise process
+        # actions += self.noise_scale*self.noise.sample()
+
+        return np.clip(actions, -1, 1)
 
     def reset(self):
         self.noise.reset()
 
-    def learn(self, experiences, gamma, actions_pred_loc, next_actions_pred_tar):
+    def learn(self, experiences, gamma):
+        # for MADDPG
         """Update policy and value parameters using given batch of experience tuples.
         Q_targets = r + γ * critic_target(next_state, actor_target(next_state))
         where:
@@ -70,38 +95,38 @@ class Agent():
 
         Params
         ======
-            experiences (Tuple[torch.Tensor]): tuple of (s, a, r, s', done) tuples 
+            experiences (Tuple[torch.Tensor]): tuple of (s, a, r, s', done) tuples
             gamma (float): discount factor
         """
-        states, actions, rewards, next_states, dones = experiences
-        # print("state shape (in learn)", states.shape)
-        # print("action shape (in learn)", actions.shape)
-        # print("rewards shape (in learn)", rewards.shape)
-        # print("rewards shape (in learn)", rewards)
-        # print("next_states (in learn)", next_states.shape)
-        # print("dones (in learn)", dones.shape)
-        # print("dones (in learn)", dones)
-        # print("a_pred_loc (in learn)", actions_pred_loc.shape)
-        # print("next_a_pred_tar (in learn)", next_actions_pred_tar.shape)
+        full_states, actor_full_actions, full_actions, agent_rewards, agent_dones, full_next_states, critic_full_next_actions = experiences
 
         # ---------------------------- update critic ---------------------------- #
-        Q_targets_next = self.critic_target(next_states, next_actions_pred_tar)
-        Q_targets = rewards + (gamma * Q_targets_next * (1 - dones))
-        Q_expected = self.critic_local(states, actions)
-        critic_loss = F.mse_loss(Q_expected, Q_targets)
+        # Get Q values from target models
+        Q_target_next = self.critic_target(full_next_states, critic_full_next_actions)
+        # Compute Q targets for current states (y_i)
+        Q_target = agent_rewards + gamma * Q_target_next * (1 - agent_dones)
+        # Compute critic loss
+        Q_expected = self.critic_local(full_states, full_actions)
+        critic_loss = F.mse_loss(input=Q_expected,
+                                 target=Q_target)  # target=Q_targets.detach() #not necessary to detach
         # Minimize the loss
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
+        # torch.nn.utils.clip_grad_norm(self.critic_local.parameters(), 1.0) #clip the gradient for the critic network (Udacity hint)
         self.critic_optimizer.step()
 
         # ---------------------------- update actor ---------------------------- #
         # Compute actor loss
-        #
-        actor_loss = -self.critic_local(states, actions_pred_loc).mean()
+        actor_loss = -self.critic_local.forward(full_states,
+                                                actor_full_actions).mean()  # -ve b'cse we want to do gradient ascent
         # Minimize the loss
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
         self.actor_optimizer.step()
+
+    def add_noise2(self):
+        noise = 0.5*np.random.randn(1, self.action_size) #sigma of 0.5 as sigma of 1 will have alot of actions just clipped
+        return noise
 
     def targets_update(self, tau):
         """
@@ -145,7 +170,19 @@ class OUNoise:
     def sample(self):
         """Update internal state and return it as a noise sample."""
         x = self.state
-        dx = self.theta * (self.mu - x) + self.sigma * np.random.randn(self.size)
+        dx = self.theta * (self.mu - x) + self.sigma * np.random.randn(self.size) # modify the original version which used random integer generator
         self.state = x + dx
         return self.state
 
+
+
+    # def act_ou(self, state, add_noise=True):
+    #     """Returns actions for given state as per current policy."""
+    #     state = torch.from_numpy(state).float().to(device)
+    #     self.actor_local.eval()
+    #     with torch.no_grad():
+    #         action = self.actor_local(state).cpu().data.numpy()
+    #     self.actor_local.train()
+    #     if add_noise:
+    #         action += self.noise.sample()
+    #     return np.clip(action, -1, 1)
