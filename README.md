@@ -35,9 +35,39 @@ The environment is considered solved, when the average (over 100 episodes) of th
 
     (_For AWS_) If you'd like to train the agent on AWS (and have not [enabled a virtual screen](https://github.com/Unity-Technologies/ml-agents/blob/master/docs/Training-on-Amazon-Web-Service.md)), then please use [this link](https://s3-us-west-1.amazonaws.com/udacity-drlnd/P3/Tennis/Tennis_Linux_NoVis.zip) to obtain the "headless" version of the environment.  You will **not** be able to watch the agent without enabling a virtual screen, but you will be able to train the agent.  (_To watch the agent, you should follow the instructions to [enable a virtual screen](https://github.com/Unity-Technologies/ml-agents/blob/master/docs/Training-on-Amazon-Web-Service.md), and then download the environment for the **Linux** operating system above._)
 
-2. Place the file in the DRLND GitHub repository, in the `p3_collab-compet/` folder, and unzip (or decompress) the file. 
+2. Place the file in the DRLND GitHub repository, in the `p3_collab-compet/` folder, and unzip (or decompress) the file.   
 
+### Prerequisites
+1. Please first setup a Python3 [Anaconda](https://www.anaconda.com/download) environment. 
+2. Then install the requirements for the project through:
+```
+pip install -r requirement.txt
+```
+3. clone the repo
+```
+git clone git@github.com:ulamaca/DRLND_P3_MultiAgent_RL.git
+```
+4. Follow the instructions at Getting Started section to download the environment 
+
+5. Place the env directory in the root of the project and rename it as "Tennis_Linux"
+ 
 ### Instructions
+1. To train a 2-agent MADDPG system from scratch, execute in the command line:
+```
+python run.py  
+```
+After trained, several files will be saved in ./data/maddpg: progress.txt and *checkpoint.pth files. progress.txt saves the training score traces and *checkpoint.pth are the model parameters corresponding to actor/critic for 
+the 1st and the 2nd agents.
 
-Follow the instructions in `Tennis.ipynb` to get started with training your own agent!  
+2. To get statistics plots after training, execute:
+```
+python plot.py -l maddpg
+``` 
 
+3. To see how your favorite agent plays, use
+```
+python play.py -p path/to/model-params 
+```
+If you did not get one, try out
+```
+plot.py play.py -p ./data/saved/checkpoint.pth

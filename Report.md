@@ -3,7 +3,7 @@
 [anime1]: ./data/ppo_trained_animation.gif
 ### **Algorithms**
 In this project, I applied MADDPG (Multi-Agent Deep Deterministic Policy Gradients) to solve a 2-agent Tennis game (Unity Tennis environment). 
-DDPG is one of the most basic form of deep reinforcement learning agent for solving continuous control problems. By using deterministic policy, policy gradients with respect to 
+DDPG is one of the most basic forms of deep reinforcement learning agent for solving continuous control problems. By using deterministic policy, policy gradients with respect to 
 the value function is computable. Therefore, DDPG algorithm replaces such policy in DQN and re-formulate it as an actor-critic style learning algorithms where 
 Q-function is learned using deep-Q learning and policy learning part use the aforementioned gradients. 
 
