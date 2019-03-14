@@ -4,6 +4,7 @@ import numpy as np
 from maddpg_agent import MADDPGAGENT
 import time
 import os
+import argparse
 
 n_epsisodes=5000
 training=True
@@ -12,12 +13,11 @@ print_every = 100
 state_size=24
 action_size=2
 num_agents=2
+EXPS_ROOT_PATH = './data'
 
-
-# def seeding(seed=10):
-#     random.seed(seed)
-#     np.random.seed(seed)
-#     torch.manual_seed(seed)
+parser=argparse.ArgumentParser(description="train a MADDPG system in Unity Tennis Environment")
+parser.add_argument('-n', '--name', type=str, metavar='', default='no-name-exp', help="name of the training run (default no-name-exp)")
+args=parser.parse_args()
 
 
 if __name__ == "__main__":
@@ -44,18 +44,22 @@ if __name__ == "__main__":
         scores_history.append(episdoe_score)
         scores_deque.append(episdoe_score)
         mean_score_deque=np.mean(scores_deque)
-        print('\rScore (max over agents) from episode {}: {:.4f}'.format(i, episdoe_score), end="")
+        print('\rScore (max over agents) from episode {}: {:.4f}, current noise scale {}'.format(i, episdoe_score,
+                                                                                                 agent.noise.current_noise_scale(agent.t_step)), end="")
         if i>0 and i % print_every==0:
-            print('\rMean Score (max over agents) from episode {}: {:.4f}'.format(i, mean_score_deque))
+            print('\nMean Score (max over agents) from episode {}: {:.4f}'.format(i, mean_score_deque))
         if mean_score_deque > 0.5:
             print("\nProblem Solved!")
             break
     t1=time.time()
 
     print("\nTotal time elapsed: {} seconds".format(t1-t0))
+
     # save agent params:
-    agent.save_params()
-    with open(os.path.join('./data/maddpg_test/progress.txt'), 'w') as myfile:
+    exp_dir = os.path.join(EXPS_ROOT_PATH, args.name)
+    os.makedirs(exp_dir, exist_ok=True)
+    agent.save_params(save_dir=exp_dir)
+    with open(exp_dir, 'w') as myfile:
         myfile.write(str(scores_history))
     myfile.close()
 
