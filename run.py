@@ -17,6 +17,7 @@ EXPS_ROOT_PATH = './data'
 
 parser=argparse.ArgumentParser(description="train a MADDPG system in Unity Tennis Environment")
 parser.add_argument('-n', '--name', type=str, metavar='', default='no-name-exp', help="name of the training run (default no-name-exp)")
+parser.add_argument('-ne', '--num_episodes', type=int, metavar='', default=3000, help="")
 args=parser.parse_args()
 
 
@@ -27,7 +28,7 @@ if __name__ == "__main__":
     scores_history = []
     scores_deque = deque(maxlen=print_every)
     t0=time.time()
-    for i in range(n_epsisodes):
+    for i in range(args.num_episodes):
         states = env.reset()
         scores = np.zeros(num_agents)                          # initialize the score (for each agent)
         #agent.reset()                                          # reset all noise mu_i
@@ -59,7 +60,7 @@ if __name__ == "__main__":
     exp_dir = os.path.join(EXPS_ROOT_PATH, args.name)
     os.makedirs(exp_dir, exist_ok=True)
     agent.save_params(save_dir=exp_dir)
-    with open(exp_dir, 'w') as myfile:
+    with open(os.path.join(exp_dir, 'progress.txt'), 'w') as myfile:
         myfile.write(str(scores_history))
     myfile.close()
 
