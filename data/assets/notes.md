@@ -15,3 +15,8 @@
     - actor_full_actions = a\ai-U-{mu_i(o_i)}
 
 4. PyTorch autograd is very elegant for both A/C learning in DDPG, check DDPGAGENT.learn
+5. There are 3 sources of randomness in this project: NN, Buffer, Noise generation    
+
+To Work On:
+1. FCNetwork is not directly applicable into this program, need some time to figure out why
+2. Add features of PyToch 1. ModelViz, 2. TensorBoard; 3. AWS interface for efficient debugging/testing
