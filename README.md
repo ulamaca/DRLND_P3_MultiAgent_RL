@@ -56,18 +56,21 @@ git clone git@github.com:ulamaca/DRLND_P3_MultiAgent_RL.git
 ```
 python run.py  
 ```
-After trained, several files will be saved in ./data/maddpg: progress.txt and *checkpoint.pth files. progress.txt saves the training score traces and *checkpoint.pth are the model parameters corresponding to actor/critic for 
-the 1st and the 2nd agents.
+After trained, several files will be saved in ./data/maddpg: progress.txt and *checkpoint.pth files. progress.txt saves the training score traces and *checkpoint.pth are the model parameters corresponding to actor/critic for the 1st and the 2nd agents. There are some options to execute your run.py, check python run.py -h for details.
 
 2. To get statistics plots after training, execute:
 ```
-python plot.py -l maddpg
+python plot.py -l name-of-your-model-in-./data
+``` 
+For example,
+```
+python plot.py -l saved
 ``` 
 
 3. To see how your favorite agent plays, use
 ```
-python play.py -p path/to/model-params 
+python play.py -n name-of-your-model-in-./data
 ```
 If you did not get one, try out
 ```
-plot.py play.py -p ./data/saved/checkpoint.pth
+plot.py play.py -n saved
