@@ -5,7 +5,7 @@ import numpy as np
 from utils import random_color
 import argparse
 
-GOAL_SCORE=30.0
+GOAL_SCORE=0.5
 LINESTYLES = ['-', '--', ':', '-.']
 
 parser=argparse.ArgumentParser(description="Plot the statistics of training traces")
