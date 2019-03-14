@@ -9,23 +9,24 @@ from model import Actor, Critic
 
 
 # todo, check hyperparam
-BUFFER_SIZE = int(3e4)  # replay buffer size
-BATCH_SIZE = 256       # minibatch size
+BUFFER_SIZE = int(5e4)  # replay buffer size
+BATCH_SIZE = 200       # minibatch size
 GAMMA = 0.99            # discount factor
-LEARN_EVERY = 1        # updating frequency
-UPDATES_PER_LEARN = 3   # learning steps per learning step
+LEARN_EVERY = 2        # updating frequency
+UPDATES_PER_LEARN = 4   # learning steps per learning step
 STEPS_BEFORE_LEARNING = 5500
 NOISE_START=1.0
 NOISE_END=0.1
 EXPLORATION_DECAY= 0.999 # 2/(t_max*n_episodes) let t_max~25, n_episodes=4000
-L_FACTOR=50
+L_FACTOR=80
 TAU = 1e-3              # for soft update of target parameters
 LR_ACTOR = 1e-4         # learning rate of the actor
-LR_CRITIC = 3e-4        # learning rate of the critic
+LR_CRITIC = 5e-4        # learning rate of the critic
 WEIGHT_DECAY_actor = 0.0  # L2 weight decay
 WEIGHT_DECAY_critic = 0.0  # L2 weight decay
-RANDOM_SEED=10
+RANDOM_SEED=70
 np.random.seed(seed=RANDOM_SEED) # to control noise sampling
+
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
@@ -278,7 +279,6 @@ class MADDPGAGENT():
 
         full_actions = actions.view(-1, whole_action_dim)
 
-        #### Alternative-1 
         # start = agent_no * self.action_size
         # end = start + self.action_size
         # actor_full_actions[:, start:end]=agent.actor_local.forward(agent_state)
@@ -298,13 +298,13 @@ class MADDPGAGENT():
             torch.save(agent.actor_local.state_dict(), actor_params_path)
             torch.save(agent.critic_local.state_dict(), critic_params_path)
 
-    # def load_maddpg(self):
-    #     for agent_id, agent in enumerate(self.maddpg_agents):
-    #         # Since the model is trained on gpu, need to load all gpu tensors to cpu:
-    #         agent.actor_local.load_state_dict(torch.load('checkpoint_actor_local_' + str(agent_id) + '.pth',
-    #                                                      map_location=lambda storage, loc: storage))
-    #         agent.critic_local.load_state_dict(torch.load('checkpoint_critic_local_' + str(agent_id) + '.pth',
-    #                                                       map_location=lambda storage, loc: storage))
+    def load_params(self, load_dir='./data/maddpg_test/', load_all=True):
+        if load_all:
+            for ith_agent, agent in self.agents.items():
+                actor_params_path=os.path.join(load_dir, 'checkpoint_actor_' + str(ith_agent) + '.pth')
+                critic_params_path=os.path.join(load_dir, 'checkpoint_critic_' + str(ith_agent) + '.pth')
+                agent.actor_local.load_state_dict(torch.load(actor_params_path))
+                agent.critic_local.load_state_dict(torch.load(critic_params_path))
 
 
 class ReplayBuffer:
@@ -358,4 +358,4 @@ class GaussianExplorationNoise:
         if t<self.t_0:
             return self.e_0
         else:
-            return max(self.e_0*self.alpha**( (t-self.t_0)//L_FACTOR), self.e_T)
+            return max( self.e_0*self.alpha**( (t-self.t_0)//L_FACTOR), self.e_T)
