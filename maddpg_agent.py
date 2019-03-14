@@ -126,7 +126,7 @@ class DDPGAGENT(object):
             return self.noisy_act(states, noise_scale)
 
     def add_noise2(self):
-        #todo, from Amit Patel's work
+        # get this method from: https://github.com/gtg162y/DRLND/blob/master/P3_Collab_Compete/Tennis_Udacity_Workspace.ipynb
         noise = 0.5 * np.random.randn(1, self.action_size)  # sigma of 0.5 as sigma of 1 will have alot of actions just clipped
         return noise
 
