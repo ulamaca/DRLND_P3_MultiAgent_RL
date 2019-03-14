@@ -7,12 +7,11 @@ import random
 from collections import namedtuple, deque
 from model import Actor, Critic
 
-
-# todo, check hyperparam
+# Hyperparamerters:
 BUFFER_SIZE = int(5e4)  # replay buffer size
-BATCH_SIZE = 200       # minibatch size
+BATCH_SIZE = 200        # minibatch size
 GAMMA = 0.99            # discount factor
-LEARN_EVERY = 2        # updating frequency
+LEARN_EVERY = 2         # updating frequency
 UPDATES_PER_LEARN = 4   # learning steps per learning step
 STEPS_BEFORE_LEARNING = 5500
 NOISE_START=1.0
@@ -26,6 +25,10 @@ WEIGHT_DECAY_actor = 0.0  # L2 weight decay
 WEIGHT_DECAY_critic = 0.0  # L2 weight decay
 RANDOM_SEED=70
 np.random.seed(seed=RANDOM_SEED) # to control noise sampling
+# other possible hyperparams:
+# 1. gradient clipping strength
+# 2. option of linear decay action space exploration schedule
+
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -47,6 +50,7 @@ def xenv_to_oi(xenv, ith_agent):
     return np.reshape(xenv[ith_agent,:], newshape=(1,-1))
 
 
+# the approach to reformat the joint state x I came up with, leaving here for reference
 # def xmem_to_oi(xmem, ith_agent, state_size):
 #     """
 #         input format of [batch_size, dx], torch tensor
@@ -70,11 +74,11 @@ def xmem_to_oi(xmem, ith_agent, state_size):
     ith_agent = torch.tensor([ith_agent]).to(device)
     return xmem.reshape(-1, 2, state_size).index_select(1, ith_agent).squeeze(1)
 
+
 class DDPGAGENT(object):
-    """Interacts with and learns from the environment.
-    There are two agents and the observations of each agent has 24 dimensions. Each agent's action has 2 dimensions.
-    Will use two separate actor networks (one for each agent using each agent's observations only and output that agent's action).
-    The critic for each agents gets to see the actions and observations of all agents. """
+    """
+    DDPG Agent in the context of MADDPG
+    """
 
     def __init__(self, state_size, action_size, n_agents, random_seed=RANDOM_SEED,
                  lr_a=LR_ACTOR, lr_c=LR_CRITIC):
@@ -89,19 +93,19 @@ class DDPGAGENT(object):
         self.action_size = action_size
         self.n_agents = n_agents
 
-        # Actor Network (w/ Target Network)
+        # Actor Networks
         self.actor_local = Actor(state_size, action_size, seed=random_seed).to(device)
         self.actor_target = Actor(state_size, action_size, seed=random_seed).to(device)
         self.actor_optimizer = optim.Adam(self.actor_local.parameters(), lr=lr_a, weight_decay=WEIGHT_DECAY_actor)
 
-        # Critic Network (w/ Target Network)
+        # Critic Networks
         self.critic_local = Critic(n_agents * state_size, n_agents * action_size, seed=random_seed).to(device)
         self.critic_target = Critic(n_agents * state_size, n_agents * action_size, seed=random_seed).to(device)
         self.critic_optimizer = optim.Adam(self.critic_local.parameters(), lr=lr_c,
                                            weight_decay=WEIGHT_DECAY_critic)
 
-        # Make sure target is initialized with the same weight as the source (makes a big difference)
-        self.soft_update_all(tau=0.0)
+        # Initialize the target and local networks with the same parameters (key for success)
+        self.targets_update(tau=0.0) # soft_update(tau=0.0) <=> hard_update
 
     def noisy_act(self, states, noise_scale):
         states = torch.from_numpy(states).float().to(device)
@@ -109,13 +113,10 @@ class DDPGAGENT(object):
         with torch.no_grad():
             actions = self.actor_local(states).cpu().data.numpy()
         self.actor_local.train()
-        # add noise
-        actions += noise_scale * self.add_noise2()  # works much better than OU Noise process
-        # actions += self.noise_scale*self.noise.sample()
+        actions += noise_scale * self.add_noise2()
         return np.clip(actions, -1, 1)
 
     def act(self, states, noise_scale=0.0, add_noise=True):
-        """Returns actions for given state as per current policy."""
         if not add_noise:
             if noise_scale>0.0:
                 raise TypeError("when add_noise==True, noise_scale must be zero")
@@ -124,13 +125,12 @@ class DDPGAGENT(object):
         else:
             return self.noisy_act(states, noise_scale)
 
-
     def add_noise2(self):
+        #todo, from Amit Patel's work
         noise = 0.5 * np.random.randn(1, self.action_size)  # sigma of 0.5 as sigma of 1 will have alot of actions just clipped
         return noise
 
     def learn(self, experiences, gamma):
-        # for MADDPG
         """Update policy and value parameters using given batch of experience tuples.
         Q_targets = r + γ * critic_target(next_state, actor_target(next_state))
         where:
@@ -142,34 +142,24 @@ class DDPGAGENT(object):
             experiences (Tuple[torch.Tensor]): tuple of (s, a, r, s', done) tuples
             gamma (float): discount factor
         """
-        full_states, actor_full_actions, full_actions, agent_rewards, agent_dones, full_next_states, critic_full_next_actions = experiences
+        xmems, actor_full_actions, actions, rewards, dones, next_xmems, critic_full_next_actions = experiences
 
-        # ---------------------------- update critic ---------------------------- #
-        # Get Q values from target models
-        Q_target_next = self.critic_target(full_next_states, critic_full_next_actions)
-        # Compute Q targets for current states (y_i)
-        Q_target = agent_rewards + gamma * Q_target_next * (1 - agent_dones)
-        # Compute critic loss
-        Q_expected = self.critic_local(full_states, full_actions)
-        critic_loss = F.mse_loss(input=Q_expected,
-                                 target=Q_target)  # target=Q_targets.detach() #not necessary to detach
-        # Minimize the loss
+        # Critic Learning (Deep Q-learning)
+        Q_target_next = self.critic_target(next_xmems, critic_full_next_actions)
+        Q_target = rewards + gamma * Q_target_next * (1 - dones)
+        Q_expected = self.critic_local(xmems, actions)
+        critic_loss = F.mse_loss(input=Q_expected, target=Q_target)
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
-        # torch.nn.utils.clip_grad_norm(self.critic_local.parameters(), 1.0) #clip the gradient for the critic network (Udacity hint)
         self.critic_optimizer.step()
 
-        # ---------------------------- update actor ---------------------------- #
-        # Compute actor loss
-        actor_loss = -self.critic_local.forward(full_states,
-                                                actor_full_actions).mean()  # -ve b'cse we want to do gradient ascent
-        # Minimize the loss
+        # Actor Learning (Deterministic Policy Gradients w.r.t Q-function)
+        actor_loss = -self.critic_local.forward(xmems, actor_full_actions).mean()
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
         self.actor_optimizer.step()
 
-    def soft_update_all(self, tau):
-        # ----------------------- update target networks ----------------------- #
+    def targets_update(self, tau):
         self.soft_update(self.critic_local, self.critic_target, tau)
         self.soft_update(self.actor_local, self.actor_target, tau)
 
@@ -188,7 +178,9 @@ class DDPGAGENT(object):
 
 
 class MADDPGAGENT():
-    """Interacts with and learns from the environment."""
+    """
+    Implementation MADDPG multi-agent system class
+    """
     
     def __init__(self, state_size, action_size, n_agents, random_seed):
         """Initialize an Agent object.
@@ -219,12 +211,11 @@ class MADDPGAGENT():
         """Save experience in replay memory, and use random sample from buffer to learn."""
         # Save experience / reward
         self.memory.add(xenv_to_xmem(state),
-                        action,
+                        xenv_to_xmem(action), #todo, debug compare to the working version
                         reward,
                         xenv_to_xmem(next_state),
                         done)
 
-        # Learn, if enough samples are available in memory
         self.t_step = self.t_step + 1
 
         if self.t_step % LEARN_EVERY == 0 and self.t_step > STEPS_BEFORE_LEARNING:
@@ -233,7 +224,7 @@ class MADDPGAGENT():
                     for ith_agent in range(self.n_agents):
                         experiences = self.memory.sample()
                         self.learn(experiences, GAMMA, ith_agent)
-                    self.multi_agents_target_update(tau=TAU)
+                    self.multi_agents_targets_update(tau=TAU)
 
     def multi_agents_act(self, states, add_noise=True):
         """return actions of all agents"""
@@ -250,46 +241,30 @@ class MADDPGAGENT():
         actions = np.concatenate(actions, axis=0)
         return actions
 
-    def multi_agents_target_update(self, tau):
+    def multi_agents_targets_update(self, tau):
         for ith_agent in range(self.n_agents):
-            self.agents[ith_agent].soft_update_all(tau=TAU)
+            self.agents[ith_agent].targets_update(tau=tau)
 
-    def learn(self, samples, gamma, agent_no):
-        # for learning MADDPG
-        full_states, actions, rewards, full_next_states, dones = samples
+    def learn(self, experiences, gamma, ith_agent):
+        xmems, full_actions, full_rewards, next_xmems, full_dones = experiences
 
-        whole_action_dim=self.action_size*self.n_agents
+        critic_full_next_actions = torch.zeros(full_actions.shape, dtype=torch.float, device=device)
+        for jth_agent in range(self.n_agents):
+            agent_next_state=xmem_to_oi(next_xmems, jth_agent, self.state_size)
+            start = jth_agent * self.action_size
+            end = start + self.action_size
+            critic_full_next_actions[:, start:end] = self.agents[jth_agent].actor_target.forward(agent_next_state)
 
-        # todo, if it works, to see what is different between agnet_id and agent_no
-        critic_full_next_actions = torch.zeros(actions.shape, dtype=torch.float, device=device)
-        for agent_id in range(self.n_agents):
-            agent_next_state=xmem_to_oi(full_next_states, agent_id, self.state_size)
-            #### Alternative-1
-            # start = agent_id * self.action_size
-            # end = start + self.action_size
-            # critic_full_next_actions[:, start:end] = self.agents[agent_id].actor_target.forward(agent_next_state)
-            ####
-            critic_full_next_actions[:, agent_id, :] = self.agents[agent_id].actor_target.forward(agent_next_state)
-        critic_full_next_actions = critic_full_next_actions.view(-1, whole_action_dim)
+        agent_state = xmem_to_oi(next_xmems, ith_agent, self.state_size)
+        actor_full_actions = full_actions.clone()
+        start = ith_agent * self.action_size
+        end = start + self.action_size
+        actor_full_actions[:, start:end]=self.agents[ith_agent].actor_local.forward(agent_state)
 
-        agent_state = xmem_to_oi(full_next_states, agent_no, self.state_size)
-        actor_full_actions = actions.clone()
-        actor_full_actions[:, agent_no, :] = self.agents[agent_no].actor_local.forward(agent_state)
-        actor_full_actions = actor_full_actions.view(-1, whole_action_dim)
-
-        full_actions = actions.view(-1, whole_action_dim)
-
-        # start = agent_no * self.action_size
-        # end = start + self.action_size
-        # actor_full_actions[:, start:end]=agent.actor_local.forward(agent_state)
-        # full_actions=actions
-
-
-        agent_rewards = rewards[:, agent_no].view(-1, 1)  # gives wrong result without doing this
-        agent_dones = dones[:, agent_no].view(-1, 1)  # gives wrong result without doing this
-        experiences = (full_states, actor_full_actions, full_actions, agent_rewards, \
-                       agent_dones, full_next_states, critic_full_next_actions)
-        self.agents[agent_no].learn(experiences, gamma)
+        ddpg_experiences = (xmems, actor_full_actions, full_actions,
+                            full_rewards[:, ith_agent].view(-1, 1), full_dones[:, ith_agent].view(-1, 1),  # giving only individual rewards/dones for each agent
+                            next_xmems, critic_full_next_actions)
+        self.agents[ith_agent].learn(ddpg_experiences, gamma)
 
     def save_params(self, save_dir='./data/maddpg_test/'):
         for ith_agent, agent in self.agents.items():
@@ -299,6 +274,7 @@ class MADDPGAGENT():
             torch.save(agent.critic_local.state_dict(), critic_params_path)
 
     def load_params(self, load_dir='./data/maddpg_test/', load_all=True):
+        # todo, expose load_all, for the future possible option of loading not all agents
         if load_all:
             for ith_agent, agent in self.agents.items():
                 actor_params_path=os.path.join(load_dir, 'checkpoint_actor_' + str(ith_agent) + '.pth')
@@ -308,7 +284,23 @@ class MADDPGAGENT():
 
 
 class ReplayBuffer:
-    """Fixed-size buffer to store experience tuples."""
+    """Fixed-size buffer to store experience tuples.
+        the ReplayBuffer here is shared by all DDPG agents in this MADDPG implementation, thus the experience is stored in
+        multi-agent manner:
+        The experience tuple has the following:
+            N: Number of agents
+
+            1. x, joint state of all agents=(s1,...sN)                   format: (N*dS,) np.array
+            2. full_action, joint actions of all agents=(a1,...,aN)      format: (N*dA,) np.array
+            3. full_reward,                                              format: (N,)    np.array
+            4. next_x, joint next state of all agents                    format: (N*dS,) np.array
+            5. full_done,                                                format: (N,)    np.array
+
+        The sampled experiences will become torch.Tensor format as:
+            Nb: mini-batch size,
+            the format of entry in the tuple becomes: (Nb,) + entry.shape
+            and will be named when being used : entry_names (e.g. xs)
+    """
 
     def __init__(self, buffer_size, batch_size, seed):
         """Initialize a ReplayBuffer object.
@@ -347,6 +339,11 @@ class ReplayBuffer:
 
 class GaussianExplorationNoise:
     '''
+    Gaussian Exploration Noise for action space exploration:
+        noise_scale is exponentially decaying as agents makes more steps (t), precisely
+                       1.  e_0                               ,if t<t_0
+        noise_scale =  2.  e_0 x alpha^( (t-t_0)//L_factor ) ,if t>t_0 and value of 2.<e_T
+                       3.  e_T                               ,if value of 2.>e_T
     '''
     def __init__(self, epsilon_0, epsilon_end, t_0, decay_factor):
         self.e_0=epsilon_0

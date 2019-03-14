@@ -6,7 +6,7 @@ import time
 import os
 import argparse
 
-n_epsisodes=5000
+
 training=True
 seed = 10
 print_every = 100
@@ -31,7 +31,6 @@ if __name__ == "__main__":
     for i in range(args.num_episodes):
         states = env.reset()
         scores = np.zeros(num_agents)                          # initialize the score (for each agent)
-        #agent.reset()                                          # reset all noise mu_i
         while True:
             actions = agent.multi_agents_act(states)           # select an action (for each agent)
             next_states, rewards, dones = env.step(actions)
