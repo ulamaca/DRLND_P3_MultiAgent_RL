@@ -58,9 +58,7 @@ Related works:
 
 
 ### **Appendix** 
-Hyperparameters
-
-# Hyperparamerters:
+#### Hyperparamerters:
 | Hyperparameter                      | Value |
 | ----------------------------------- | ----- |
 | Replay Buffer Size                  | 5e4   |
