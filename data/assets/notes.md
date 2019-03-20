@@ -19,4 +19,8 @@
 
 To Work On:
 1. FCNetwork is not directly applicable into this program, need some time to figure out why
-2. Add features of PyToch 1. ModelViz, 2. TensorBoard; 3. AWS interface for efficient debugging/testing
+2. Add features of PyToch 
+    1. ModelViz, 
+    2. TensorBoard; 
+    3. AWS interface for efficient debugging/testing
+        * 03.20 I claimed my AWS credits for the Nano-degree 
