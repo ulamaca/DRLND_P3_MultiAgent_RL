@@ -23,4 +23,16 @@ To Work On:
     1. ModelViz, 
     2. TensorBoard; 
     3. AWS interface for efficient debugging/testing
-        * 03.20 I claimed my AWS credits for the Nano-degree 
+        * 03.20 I claimed my AWS credits for the Nano-degree
+        * 03.22 Try to construct a AWS AMI instance but failed to connect to it because of the key pair 
+            * till the point of 6. in the Udacity reference:
+            * the error message:
+                gj@gj-XPS-13-9360:~/Downloads$ ssh -i play_drl.pem ubuntu@13.112.104.7
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@         WARNING: UNPROTECTED PRIVATE KEY FILE!          @
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+Permissions 0664 for 'play_drl.pem' are too open.
+It is required that your private key files are NOT accessible by others.
+This private key will be ignored.
+Load key "play_drl.pem": bad permissions
+
