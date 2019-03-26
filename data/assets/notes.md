@@ -27,12 +27,19 @@ To Work On:
         * 03.22 Try to construct a AWS AMI instance but failed to connect to it because of the key pair 
             * till the point of 6. in the Udacity reference:
             * the error message:
-                gj@gj-XPS-13-9360:~/Downloads$ ssh -i play_drl.pem ubuntu@13.112.104.7
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-@         WARNING: UNPROTECTED PRIVATE KEY FILE!          @
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-Permissions 0664 for 'play_drl.pem' are too open.
-It is required that your private key files are NOT accessible by others.
-This private key will be ignored.
-Load key "play_drl.pem": bad permissions
+                gj@gj-XPS-13-9360:~/Downloads$ ssh -i play_drl.pem ubuntu@13.112.104.7          
+            @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+            @         WARNING: UNPROTECTED PRIVATE KEY FILE!          @
+            @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+            Permissions 0664 for 'play_drl.pem' are too open.
+            It is required that your private key files are NOT accessible by others.
+            This private key will be ignored.
+            Load key "play_drl.pem": bad permissions
+            * Problem resolved by execute: chmod 400 ~/path_to_pem_file
+                * cf: https://stackoverflow.com/questions/9270734/ssh-permissions-are-too-open-error        
 
+3. Merge the three projects in the nano-degree 
+4. Hyperparam selection platform:
+    * https://www.comet.ml/
+    * https://www.floydhub.com/
+    * package: https://ray.readthedocs.io/en/latest/tune.html
