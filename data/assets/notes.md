@@ -38,7 +38,15 @@ To Work On:
             * Problem resolved by execute: chmod 400 ~/path_to_pem_file
                 * cf: https://stackoverflow.com/questions/9270734/ssh-permissions-are-too-open-error
             * log:
-                - play MADDPG on AWS instances        
+                - 3.28.2019 play MADDPG on AWS instances
+                    - challenge: no video rendering on AWS for runing RL training procedure
+                        - naive solution: use jupyter notebook to run
+                    - git clone my github (http)
+                    - sudo pip3 install requirements.txt
+                    - download linux Tennis env: wget <web address>
+                    - create a screen env. for run
+                        - python3 run.py 
+                        - leave the process through ctrl.+a d => use screen -ls to find the process and screen -r to resume
 
 3. Merge the three projects in the nano-degree 
 4. Hyperparam selection platform:

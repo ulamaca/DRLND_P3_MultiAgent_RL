@@ -31,7 +31,7 @@ np.random.seed(seed=RANDOM_SEED) # to control noise sampling
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
+print("The device I am going to use: ", device)
 
 def xenv_to_xmem(xenv):
     """
