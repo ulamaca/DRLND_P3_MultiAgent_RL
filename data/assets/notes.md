@@ -36,7 +36,9 @@ To Work On:
             This private key will be ignored.
             Load key "play_drl.pem": bad permissions
             * Problem resolved by execute: chmod 400 ~/path_to_pem_file
-                * cf: https://stackoverflow.com/questions/9270734/ssh-permissions-are-too-open-error        
+                * cf: https://stackoverflow.com/questions/9270734/ssh-permissions-are-too-open-error
+            * log:
+                - play MADDPG on AWS instances        
 
 3. Merge the three projects in the nano-degree 
 4. Hyperparam selection platform:
